@@ -19,7 +19,7 @@
             padding: 20px;
             background-color: #f2f2f2;
             border: 2px solid #cccccc;
-            border-radius: 0; /* No rounding for an old-school look */
+            border-radius: 0;
         }
         h1 {
             color: #003366;
@@ -43,6 +43,7 @@
             font-size: 14px;
             margin-top: 10px;
             width: 100%;
+            cursor: pointer;
         }
         button:hover {
             background-color: #003366;
@@ -69,33 +70,61 @@
             border: 1px solid #ff9999;
             color: #cc0000;
         }
+        .fulfill-btn {
+            margin-top: 10px;
+            display: none;
+            text-align: center;
+        }
+        .fulfill-btn a {
+            padding: 10px 15px;
+            background-color: #00a600;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .fulfill-btn a:hover {
+            background-color: #007500;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>TXFR Manual Verification</h1>
-        <p>Enter the API key or use a link with a pre-filled API key to view manual verification info:</p>
+        <p>Enter the API key to generate verification info:</p>
         
         <input type="text" id="apiKeyInput" class="api-key-input" placeholder="Enter API Key">
-        <button onclick="fetchVerificationData()">Fetch Data</button>
+        <button onclick="fetchVerificationData()">Verify</button>
         
         <div id="verificationData" class="verification-data">
             <!-- Data will be displayed here -->
         </div>
+        
+        <div id="fulfillButton" class="fulfill-btn">
+            <!-- Fulfill button will be generated here -->
+        </div>
     </div>
 
     <script>
-        // Function to get the API key from the URL parameters
-        function getApiKeyFromUrl() {
+        function getParamsFromUrl() {
             const params = new URLSearchParams(window.location.search);
-            return params.get('apiKey');
+            return {
+                apiKey: params.get('apiKey'),
+                amount: params.get('amount')
+            };
         }
 
-        // Function to fetch verification data from Torn API
         function fetchVerificationData() {
             const apiKey = document.getElementById("apiKeyInput").value;
+            const amount = getParamsFromUrl().amount;
+            
             if (!apiKey) {
                 alert("Please enter an API key.");
+                return;
+            }
+
+            if (!amount) {
+                alert("Please provide the requested amount in the URL.");
                 return;
             }
 
@@ -107,7 +136,8 @@
                     if (data.error) {
                         displayError("Invalid API key or error in fetching data.");
                     } else {
-                        displayVerificationData(data);
+                        displayVerificationData(data, amount);
+                        generateFulfillButton(data.player_id, amount);
                     }
                 })
                 .catch(error => {
@@ -116,31 +146,34 @@
                 });
         }
 
-        // Function to display verification data on the page
-        function displayVerificationData(data) {
+        function displayVerificationData(data, amount) {
             const verificationDiv = document.getElementById("verificationData");
 
             verificationDiv.innerHTML = `
                 <div class="field"><span>Username:</span> ${data.name}</div>
                 <div class="field"><span>User ID:</span> ${data.player_id}</div>
-                <div class="field"><span>Level:</span> ${data.level}</div>
-                <div class="field"><span>Faction:</span> ${data.faction_name}</div>
-                <div class="field"><span>Rank:</span> ${data.rank}</div>
+                <div class="field"><span>Requested Amount:</span> ${amount}</div>
             `;
         }
 
-        // Function to display error message
         function displayError(message) {
             const verificationDiv = document.getElementById("verificationData");
             verificationDiv.innerHTML = `<div class="no-data">${message}</div>`;
         }
 
-        // Populate API key from URL parameter on page load
+        function generateFulfillButton(userId, amount) {
+            const fulfillDiv = document.getElementById("fulfillButton");
+            const fulfillLink = `https://www.torn.com/factions.php?step=your#/tab=controls&option=give-to-user&giveMoneyTo=${userId}&money=${amount}`;
+
+            fulfillDiv.innerHTML = `<a href="${fulfillLink}" target="_blank">Fulfill</a>`;
+            fulfillDiv.style.display = "block";
+        }
+
         window.onload = function() {
-            const apiKey = getApiKeyFromUrl();
-            if (apiKey) {
-                document.getElementById("apiKeyInput").value = apiKey;
-                fetchVerificationData(); // Automatically fetch data if API key is present
+            const params = getParamsFromUrl();
+            if (params.apiKey) {
+                document.getElementById("apiKeyInput").value = params.apiKey;
+                fetchVerificationData();
             }
         };
     </script>
