@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -27,7 +27,7 @@
             font-weight: bold;
             margin-bottom: 20px;
         }
-        .api-key-input {
+        .api-key-input, .amount-input {
             width: 100%;
             padding: 8px;
             margin: 10px 0;
@@ -91,10 +91,11 @@
 <body>
     <div class="container">
         <h1>TXFR Manual Verification</h1>
-        <p>Enter the API key to generate verification info:</p>
+        <p>Enter the API key and amount to generate verification info:</p>
         
         <input type="text" id="apiKeyInput" class="api-key-input" placeholder="Enter API Key">
-        <button onclick="fetchVerificationData()">Verify</button>
+        <input type="number" id="amountInput" class="amount-input" placeholder="Enter Requested Amount">
+        <button id="verifyButton" onclick="fetchVerificationData()">Verify</button>
         
         <div id="verificationData" class="verification-data">
             <!-- Data will be displayed here -->
@@ -116,7 +117,7 @@
 
         function fetchVerificationData() {
             const apiKey = document.getElementById("apiKeyInput").value;
-            const amount = getParamsFromUrl().amount;
+            const amount = document.getElementById("amountInput").value || getParamsFromUrl().amount;
             
             if (!apiKey) {
                 alert("Please enter an API key.");
@@ -124,7 +125,7 @@
             }
 
             if (!amount) {
-                alert("Please provide the requested amount in the URL.");
+                alert("Please provide the requested amount.");
                 return;
             }
 
@@ -173,8 +174,16 @@
             const params = getParamsFromUrl();
             if (params.apiKey) {
                 document.getElementById("apiKeyInput").value = params.apiKey;
-                fetchVerificationData();
             }
+            if (params.amount) {
+                document.getElementById("amountInput").value = params.amount;
+            }
+            if (params.apiKey || params.amount) {
+                document.getElementById("apiKeyInput").style.display = "none";
+                document.getElementById("amountInput").style.display = "none";
+                document.getElementById("verifyButton").style.display = "none"; // Hide the Verify button
+            }
+            fetchVerificationData();
         };
     </script>
 </body>
