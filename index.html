@@ -1,10 +1,10 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>TXFR Verification Viewer</title>
+    <title>TXFR | Portal</title>
     <style>
         body {
             font-family: 'Courier New', Courier, monospace;
@@ -90,8 +90,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>TXFR Manual Verification</h1>
-        <p>Enter the API key and amount to generate verification info:</p>
+        <h1>TXFR Bank Portal</h1>
+        <p>Requested amount and verified user details:</p>
         
         <input type="text" id="apiKeyInput" class="api-key-input" placeholder="Enter API Key">
         <input type="number" id="amountInput" class="amount-input" placeholder="Enter Requested Amount">
@@ -107,6 +107,8 @@
     </div>
 
     <script>
+        let userMoneyBalance = 0; // Variable to store user's money balance
+
         function getParamsFromUrl() {
             const params = new URLSearchParams(window.location.search);
             return {
@@ -138,7 +140,7 @@
                         displayError("Invalid API key or error in fetching data.");
                     } else {
                         displayVerificationData(data, amount);
-                        generateFulfillButton(data.player_id, amount);
+                        fetchFactionData(apiKey, data.player_id); // Pass user ID to fetch faction data
                     }
                 })
                 .catch(error => {
@@ -149,25 +151,80 @@
 
         function displayVerificationData(data, amount) {
             const verificationDiv = document.getElementById("verificationData");
+            const formattedAmount = formatMoney(amount);
+            const userDisplay = `${data.name} [<a href="https://www.torn.com/profiles.php?XID=${data.player_id}" target="_blank">${data.player_id}</a>]`;
 
             verificationDiv.innerHTML = `
-                <div class="field"><span>Username:</span> ${data.name}</div>
-                <div class="field"><span>User ID:</span> ${data.player_id}</div>
-                <div class="field"><span>Requested Amount:</span> ${amount}</div>
+                <div class="field"><span>Username:</span> ${userDisplay}</div>
+                <div class="field"><span>Requested Amount:</span> ${formattedAmount}</div>
+                <div class="field" id="moneyBalanceField"><span>Money Balance:</span> Loading...</div>
             `;
         }
 
-        function displayError(message) {
+        function displayFactionData(data, userId) {
+            const moneyBalanceField = document.getElementById("moneyBalanceField");
+
+            if (data.donations) {
+                const userDonation = data.donations[userId];
+                if (userDonation) {
+                    userMoneyBalance = userDonation.money_balance; // Store the money balance
+                    const formattedBalance = formatMoney(userMoneyBalance);
+                    moneyBalanceField.innerHTML = `<span>Money Balance:</span> ${formattedBalance}`;
+                    generateFulfillButton(userId, document.getElementById("amountInput").value); // Generate button after balance is fetched
+                } else {
+                    moneyBalanceField.innerHTML = `<span>Money Balance:</span> Not available for this user.`;
+                }
+            } else {
+                moneyBalanceField.innerHTML = `<span>Money Balance:</span> Not available.`;
+            }
+        }
+
+        function formatMoney(amount) {
+            return Math.floor(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+
+        function displayError(message, userId) {
             const verificationDiv = document.getElementById("verificationData");
             verificationDiv.innerHTML = `<div class="no-data">${message}</div>`;
         }
 
         function generateFulfillButton(userId, amount) {
             const fulfillDiv = document.getElementById("fulfillButton");
-            const fulfillLink = `https://www.torn.com/factions.php?step=your#/tab=controls&option=give-to-user&giveMoneyTo=${userId}&money=${amount}`;
+            const requestedAmount = parseFloat(amount); // Convert amount to a number
+
+            // Debugging output
+            console.log("Requested Amount:", requestedAmount);
+            console.log("User Money Balance:", userMoneyBalance);
+
+            // Check if the requested amount is greater than the user's money balance
+            if (isNaN(requestedAmount) || isNaN(userMoneyBalance) || requestedAmount > userMoneyBalance) {
+                fulfillDiv.innerHTML = `<div class="no-data">Insufficient funds to fulfill this request. <a href="https://www.torn.com/messages.php#/p=compose&XID=${userId}" target="_blank">Message user</a></div>`;
+                fulfillDiv.style.display = "block";
+                return; // Exit the function if funds are insufficient
+            }
+
+            const fulfillLink = `https://www.torn.com/factions.php?step=your#/tab=controls&option=give-to-user&giveMoneyTo=${userId}&money=${requestedAmount}`;
 
             fulfillDiv.innerHTML = `<a href="${fulfillLink}" target="_blank">Fulfill</a>`;
             fulfillDiv.style.display = "block";
+        }
+
+        function fetchFactionData(apiKey, userId) {
+            const factionApiUrl = `https://api.torn.com/faction/?key=${apiKey}&comment=TornAPI&selections=donations`;
+
+            fetch(factionApiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        displayError("Error fetching faction data.");
+                    } else {
+                        displayFactionData(data, userId); // Pass user ID to filter donations
+                    }
+                })
+                .catch(error => {
+                    console.error("Error fetching faction data:", error);
+                    displayError("Failed to fetch faction data.");
+                });
         }
 
         window.onload = function() {
