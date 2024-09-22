@@ -3,18 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>TXFR | Portal</title>
-    <link rel="stylesheet" href="stylesheets/style.css" />
     <style>
-        /* Global styles */
         * {
-            -webkit-box-sizing: border-box;
             box-sizing: border-box;
-        }
-
-        html {
-            font-size: 16px;
         }
 
         body {
@@ -29,7 +21,6 @@
             padding: 20px;
             background-color: #f2f2f2;
             border: 2px solid #cccccc;
-            border-radius: 0;
         }
 
         h1 {
@@ -56,25 +47,25 @@
             margin-top: 10px;
             width: 100%;
             cursor: pointer;
-            text-align: center; /* Center text for links */
-            display: inline-block; /* Ensure links behave like buttons */
-            border-radius: 4px; /* Add border radius for consistency */
+            text-align: center;
+            display: inline-block;
+            border-radius: 4px;
         }
 
         button {
-            background-color: #004488; /* Main button color */
+            background-color: #004488;
         }
 
         button:hover {
-            background-color: #003366; /* Main button hover color */
+            background-color: #003366;
         }
 
         .fulfill-btn a {
-            background-color: #004488; /* Match fulfill button color */
+            background-color: #004488;
         }
 
         .fulfill-btn a:hover {
-            background-color: #003366; /* Match fulfill button hover color */
+            background-color: #003366;
         }
 
         .verification-data {
@@ -109,7 +100,6 @@
             text-align: center;
         }
 
-        /* Spinner styles */
         .progress-spinner {
             border: 4px solid #f3f3f3;
             border-radius: 50%;
@@ -136,32 +126,33 @@
         <input type="number" id="amountInput" class="amount-input" placeholder="Enter Requested Amount">
         <button id="verifyButton" onclick="fetchVerificationData()">Verify</button>
         
-        <div id="verificationData" class="verification-data">
-            <!-- Data will be displayed here -->
-        </div>
+        <div id="verificationData" class="verification-data"></div>
         
-        <div id="fulfillButton" class="fulfill-btn">
-            <!-- Fulfill button will be generated here -->
-        </div>
+        <div id="fulfillButton" class="fulfill-btn"></div>
         
         <div id="spinner" class="progress-spinner" style="display: none;"></div>
     </div>
 
     <script>
-        let userMoneyBalance = 0; // Variable to store user's money balance
+        let userMoneyBalance = 0;
+        let originalBalance = 0;
 
         function getParamsFromUrl() {
             const params = new URLSearchParams(window.location.search);
             return {
                 apiKey: params.get('apiKey'),
-                amount: params.get('amount')
+                amount: params.get('amount'),
+                requestId: params.get('requestId'),
+                originalBalance: parseFloat(params.get('originalBalance')) || 0
             };
         }
 
         function fetchVerificationData() {
             const apiKey = document.getElementById("apiKeyInput").value;
             const amount = document.getElementById("amountInput").value || getParamsFromUrl().amount;
-            
+            const params = getParamsFromUrl();
+            originalBalance = params.originalBalance;
+
             if (!apiKey) {
                 alert("Please enter an API key.");
                 return;
@@ -172,22 +163,22 @@
                 return;
             }
 
-            const apiUrl = `https://api.torn.com/user/?key=${apiKey}&comment=TornAPI&selections=profile`;
-            document.getElementById("spinner").style.display = "block"; // Show spinner
+            const apiUrl = `https://api.torn.com/user/?key=${encodeURIComponent(apiKey)}&comment=TornAPI&selections=profile`;
+            document.getElementById("spinner").style.display = "block";
 
             fetch(apiUrl)
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById("spinner").style.display = "none"; // Hide spinner
+                    document.getElementById("spinner").style.display = "none";
                     if (data.error) {
                         displayError("Invalid API key or error in fetching data.");
                     } else {
                         displayVerificationData(data, amount);
-                        fetchFactionData(apiKey, data.player_id); // Pass user ID to fetch faction data
+                        fetchFactionData(apiKey, data.player_id);
                     }
                 })
                 .catch(error => {
-                    document.getElementById("spinner").style.display = "none"; // Hide spinner
+                    document.getElementById("spinner").style.display = "none";
                     console.error("Error fetching data:", error);
                     displayError("Failed to fetch data.");
                 });
@@ -197,8 +188,10 @@
             const verificationDiv = document.getElementById("verificationData");
             const formattedAmount = formatMoney(amount);
             const userDisplay = `${data.name} [<a href="https://www.torn.com/profiles.php?XID=${data.player_id}" target="_blank">${data.player_id}</a>]`;
+            const transactionId = getParamsFromUrl().requestId;
 
             verificationDiv.innerHTML = `
+                <div class="field"><span>Transaction ID:</span> ${transactionId || 'N/A'}</div>
                 <div class="field"><span>Username:</span> ${userDisplay}</div>
                 <div class="field"><span>Requested Amount:</span> ${formattedAmount}</div>
                 <div class="field" id="moneyBalanceField"><span>Money Balance:</span> Loading...</div>
@@ -207,14 +200,23 @@
 
         function displayFactionData(data, userId) {
             const moneyBalanceField = document.getElementById("moneyBalanceField");
+            const transactionId = getParamsFromUrl().requestId;
 
             if (data.donations) {
                 const userDonation = data.donations[userId];
                 if (userDonation) {
-                    userMoneyBalance = userDonation.money_balance; // Store the money balance
+                    userMoneyBalance = userDonation.money_balance;
                     const formattedBalance = formatMoney(userMoneyBalance);
+
+                    if (userMoneyBalance < originalBalance) {
+                        const lastFourTransactionId = transactionId.slice(-4);
+                        const referenceNumber = `ER200-${lastFourTransactionId}-${userId}`;
+                        displayError(`This request may have been completed, contact back office admin. Reference: ${referenceNumber}`);
+                        return;
+                    }
+
                     moneyBalanceField.innerHTML = `<span>Money Balance:</span> ${formattedBalance}`;
-                    generateFulfillButton(userId, document.getElementById("amountInput").value); // Generate button after balance is fetched
+                    generateFulfillButton(userId, document.getElementById("amountInput").value);
                 } else {
                     moneyBalanceField.innerHTML = `<span>Money Balance:</span> Not available for this user.`;
                 }
@@ -230,21 +232,20 @@
         function displayError(message) {
             const verificationDiv = document.getElementById("verificationData");
             verificationDiv.innerHTML = `<div class="no-data">${message}</div>`;
+            const fulfillDiv = document.getElementById("fulfillButton");
+            if (fulfillDiv) {
+                fulfillDiv.style.display = "none";
+            }
         }
 
         function generateFulfillButton(userId, amount) {
             const fulfillDiv = document.getElementById("fulfillButton");
-            const requestedAmount = parseFloat(amount); // Convert amount to a number
+            const requestedAmount = parseFloat(amount);
 
-            // Debugging output
-            console.log("Requested Amount:", requestedAmount);
-            console.log("User Money Balance:", userMoneyBalance);
-
-            // Check if the requested amount is greater than the user's money balance
             if (isNaN(requestedAmount) || isNaN(userMoneyBalance) || requestedAmount > userMoneyBalance) {
                 fulfillDiv.innerHTML = `<div class="no-data">Insufficient funds to fulfill this request. <a href="https://www.torn.com/messages.php#/p=compose&XID=${userId}" target="_blank">Message user</a></div>`;
                 fulfillDiv.style.display = "block";
-                return; // Exit the function if funds are insufficient
+                return;
             }
 
             const fulfillLink = `https://www.torn.com/factions.php?step=your#/tab=controls&option=give-to-user&giveMoneyTo=${userId}&money=${requestedAmount}`;
@@ -262,7 +263,7 @@
                     if (data.error) {
                         displayError("Error fetching faction data.");
                     } else {
-                        displayFactionData(data, userId); // Pass user ID to filter donations
+                        displayFactionData(data, userId);
                     }
                 })
                 .catch(error => {
@@ -282,7 +283,7 @@
             if (params.apiKey || params.amount) {
                 document.getElementById("apiKeyInput").style.display = "none";
                 document.getElementById("amountInput").style.display = "none";
-                document.getElementById("verifyButton").style.display = "none"; // Hide the Verify button
+                document.getElementById("verifyButton").style.display = "none";
             }
             fetchVerificationData();
         };
