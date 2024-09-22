@@ -191,7 +191,7 @@
             const transactionId = getParamsFromUrl().requestId;
 
             verificationDiv.innerHTML = `
-                <div class="field"><span>Transaction ID:</span> ${transactionId || 'N/A'}</div>
+                <div class="field"><span>Transaction ID:</span> TXFR-${transactionId || 'N/A'}</div>
                 <div class="field"><span>Username:</span> ${userDisplay}</div>
                 <div class="field"><span>Requested Amount:</span> ${formattedAmount}</div>
                 <div class="field" id="moneyBalanceField"><span>Money Balance:</span> Loading...</div>
